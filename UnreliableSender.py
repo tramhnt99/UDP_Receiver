@@ -35,7 +35,7 @@ class UnreliableSender(BasicSender.BasicSender):
 
             packet = self.make_packet(msg_type, seqno, msg)
             self.send(packet)
-            print "sent: %s" % packet
+            # print "sent: %s" % packet
 
             response = self.receive()
             self.handle_response(response)

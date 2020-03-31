@@ -15,7 +15,7 @@ class Connection:
         self.port = port
         self.max_buf_size = 5
         self.outfile = open("%s.%d" % (host, port), "w")
-        self.seqnums = {}  # enforce single instance of each seqno
+        self.seqnums = {}  # enforce single instance of each seqno - always stays empty
 
     def ack(self, seqno, data, sack_mode=False):
         res_data = []

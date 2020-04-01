@@ -24,7 +24,7 @@ class Sender(BasicSender.BasicSender):
         self.timeout = 10 #time.time() returns flatings
         self.seq_acks = {} #hashing acks
         self.seq_msgs = {} #hashing sent messages
-        self.next_msg = self.infile.read(500)
+        self.next_msg = self.infile.read(800)
         self.msg_type = 'start'
         self.retrans = False
         if sackMode:
@@ -64,7 +64,7 @@ class Sender(BasicSender.BasicSender):
         #send the next 4 packets
         self.msg_type = 'data'
         for i  in range(4):
-            self.next_msg = self.infile.read(500)
+            self.next_msg = self.infile.read(800)
             if self.next_msg == "":
                 self.msg_type = 'end'
             packet = self.make_packet(self.msg_type, self.toSendSeqno, self.next_msg)
@@ -118,7 +118,7 @@ class Sender(BasicSender.BasicSender):
 
                         #send all packets we can send in a window
                         for i in range(self.toSendSeqno, self.currAckSeqno + self.max_buf_size):
-                            self.next_msg = self.infile.read(500)
+                            self.next_msg = self.infile.read(800)
                             self.msg_type = 'data'
                             if self.next_msg == "":
                                 self.msg_type = 'end'
@@ -130,7 +130,7 @@ class Sender(BasicSender.BasicSender):
                             msg = self.next_msg
                             # print(self.utf8len(msg))
                             self.toSendSeqno += 1
-                            
+
                             if self.msg_type == 'end':
                                 break
             else:
@@ -141,14 +141,22 @@ class Sender(BasicSender.BasicSender):
         if self.seq_acks[seqno] == self.max_buf_size - 1: #retransmit after getting 4 dups
             self.retrans = True
             del self.seq_acks[seqno]
-            for i in range(self.currAckSeqno, self.currAckSeqno + self.max_buf_size):
 
-                #resending the window
-                #if the packet has been sent and recorded
-                if i in self.seq_msgs:
-                    packet = self.make_packet(self.msg_type, i, self.seq_msgs[i])
-                    self.send(packet)
-                    print("Resent packet " + str(i))
+            #resend the packet lost only
+            if self.currAckSeqno in self.seq_msgs:
+                packet = self.make_packet(self.msg_type, self.currAckSeqno, self.seq_msgs[self.currAckSeqno])
+                self.send(packet)
+                print("Resent packet " + str(self.currAckSeqno))
+
+
+            # for i in range(self.currAckSeqno, self.currAckSeqno + self.max_buf_size):
+            #
+            #     #resending the window
+            #     #if the packet has been sent and recorded
+            #     if i in self.seq_msgs:
+            #         packet = self.make_packet(self.msg_type, i, self.seq_msgs[i])
+            #         self.send(packet)
+            #         print("Resent packet " + str(i))
 
 
 

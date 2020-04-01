@@ -17,7 +17,7 @@ forwarder, so they will magically be run.
 
 
 def tests_to_run(forwarder):
-    from tests import BasicTest, RandomDropTest, SackRandomDropTest
+    from tests import BasicTest, RandomDropTest, SackRandomDropTest, SpecificDropTest
     BasicTest.BasicTest(forwarder, "README")
     # RandomDropTest.RandomDropTest(forwarder, "README")
     # SackRandomDropTest.SackRandomDropTest(forwarder, "README")

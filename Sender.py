@@ -21,12 +21,13 @@ class Sender(BasicSender.BasicSender):
         self.currAckSeqno = 0
         self.toSendSeqno = 0
         self.max_buf_size = 5
-        self.timeout = 10 #time.time() returns flatings
         self.seq_acks = {} #hashing acks
         self.seq_msgs = {} #hashing sent messages
-        self.next_msg = self.infile.read(800)
+        self.next_msg = self.infile.read(500)
         self.msg_type = 'start'
         self.retrans = False
+        self.times = {} #hasing sending times
+        self.timeout = 0.5 #500ms
         if sackMode:
             raise NotImplementedError  # remove this line when you implement SACK
 
@@ -37,6 +38,9 @@ class Sender(BasicSender.BasicSender):
         else:
             print("recv: %s" % response_packet)
             msg_type, seqno = self.split_message(response_packet)
+
+            if int(seqno) - 1 in self.times:
+                del self.times[int(seqno) - 1] #acks are +1 of seqno of packet sent
 
             if seqno > self.currAckSeqno: #assuming we won't receive seqno beyond our window
                 if msg_type == 'ack':
@@ -58,21 +62,29 @@ class Sender(BasicSender.BasicSender):
         packet = self.make_packet(self.msg_type, self.toSendSeqno, self.next_msg)
         self.send(packet)
         print("sent packet: " + str(self.toSendSeqno))
+        self.times[self.toSendSeqno] = time.time()
         self.seq_msgs[self.toSendSeqno] = self.next_msg
-        self.toSendSeqno += 1
 
+        self.toSendSeqno += 1
         #send the next 4 packets
         self.msg_type = 'data'
         for i  in range(4):
-            self.next_msg = self.infile.read(800)
+            self.next_msg = self.infile.read(500)
             if self.next_msg == "":
                 self.msg_type = 'end'
             packet = self.make_packet(self.msg_type, self.toSendSeqno, self.next_msg)
+            self.send(packet)
 
             #just for Testing
-            if not self.toSendSeqno == 3:
-                self.send(packet)
+            # if not self.toSendSeqno == 3:
+            #     self.send(packet)
 
+            #time and check time out of previous packets
+            for i in self.times.keys():
+                if time.time() - self.times[i] > self.timeout:
+                    self.handle_timeout(i)
+
+            self.times[self.toSendSeqno] = time.time()
             self.seq_msgs[self.toSendSeqno] = self.next_msg
             print("sent packet: " + str(self.toSendSeqno))
             self.toSendSeqno += 1
@@ -82,8 +94,14 @@ class Sender(BasicSender.BasicSender):
 
         while self.currAckSeqno < self.toSendSeqno:
 
-            response = self.receive()
-            self.handle_response(response)
+            #time and check time out of previous packets
+            for i in self.times.keys():
+                if time.time() - self.times[i] > self.timeout:
+                    self.handle_timeout(i)
+
+            response = self.receive(timeout=0.4)
+            if response != None: #None means that receive timed out
+                self.handle_response(response)
 
         self.infile.close()
 
@@ -100,13 +118,20 @@ class Sender(BasicSender.BasicSender):
             for i in self.seq_msgs.keys():
                 if i < self.currAckSeqno:
                     del self.seq_msgs[i]
+                    del self.seq_acks[i + 1]
+                    if i in self.times.keys():
+                        del self.times[i]
             self.retrans = False
 
+        print(self.seq_acks.keys())
+        print("self.currAckSeqno: " + str(self.currAckSeqno))
         for n in sorted(self.seq_acks.keys()):
             if n == str(self.currAckSeqno + 1):
-                # print(n)
                 del self.seq_acks[n]
-                del self.seq_msgs[self.currAckSeqno]
+                if self.currAckSeqno in self.seq_msgs:
+                    del self.seq_msgs[self.currAckSeqno]
+                # del self.times[self.currAckSeqno]
+
                 self.currAckSeqno += 1
                 # print("self.currAckSeqno: " + str(self.currAckSeqno))
 
@@ -118,7 +143,7 @@ class Sender(BasicSender.BasicSender):
 
                         #send all packets we can send in a window
                         for i in range(self.toSendSeqno, self.currAckSeqno + self.max_buf_size):
-                            self.next_msg = self.infile.read(800)
+                            self.next_msg = self.infile.read(500)
                             self.msg_type = 'data'
                             if self.next_msg == "":
                                 self.msg_type = 'end'
@@ -126,8 +151,16 @@ class Sender(BasicSender.BasicSender):
                             packet = self.make_packet(self.msg_type, self.toSendSeqno, self.next_msg)
                             self.send(packet)
                             print("sent packet: " + str(self.toSendSeqno))
+
+                            #time and check time out of previous packets
+                            for i in self.times.keys():
+                                if time.time() - self.times[i] > self.timeout:
+                                    self.handle_timeout(i)
+
+                            self.times[self.toSendSeqno] = time.time()
                             self.seq_msgs[self.toSendSeqno] = self.next_msg
                             msg = self.next_msg
+
                             # print(self.utf8len(msg))
                             self.toSendSeqno += 1
 
@@ -146,22 +179,19 @@ class Sender(BasicSender.BasicSender):
             if self.currAckSeqno in self.seq_msgs:
                 packet = self.make_packet(self.msg_type, self.currAckSeqno, self.seq_msgs[self.currAckSeqno])
                 self.send(packet)
+                self.times[self.currAckSeqno] = time.time() #reset timer
                 print("Resent packet " + str(self.currAckSeqno))
 
 
-            # for i in range(self.currAckSeqno, self.currAckSeqno + self.max_buf_size):
-            #
-            #     #resending the window
-            #     #if the packet has been sent and recorded
-            #     if i in self.seq_msgs:
-            #         packet = self.make_packet(self.msg_type, i, self.seq_msgs[i])
-            #         self.send(packet)
-            #         print("Resent packet " + str(i))
 
+    def handle_timeout(self, seqno):
+        if int(seqno) in self.seq_msgs:
+            packet = self.make_packet(self.msg_type, int(seqno), self.seq_msgs[int(seqno)])
+            self.send(packet)
+            self.times[int(seqno)] = time.time() #restart NotImplementedError
+            print("Resent packet " + str(seqno) + " due to timeout")
+            self.retrans = True
 
-
-    def handle_timeout(self):
-        pass
 
     def log(self, msg):
         if self.debug:

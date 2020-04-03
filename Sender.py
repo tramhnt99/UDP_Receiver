@@ -23,11 +23,11 @@ class Sender(BasicSender.BasicSender):
         self.max_buf_size = 5
         self.seq_acks = {} #hashing acks
         self.seq_msgs = {} #hashing sent messages
-        self.next_msg = self.infile.read(500)
+        self.next_msg = self.infile.read(200)
         self.msg_type = 'start'
         self.retrans = False
         self.times = {} #hasing sending times
-        self.timeout = 0.5 #500ms
+        self.timeout = 0.5 #0.5s
         if sackMode:
             raise NotImplementedError  # remove this line when you implement SACK
 
@@ -68,8 +68,9 @@ class Sender(BasicSender.BasicSender):
         self.toSendSeqno += 1
         #send the next 4 packets
         self.msg_type = 'data'
+
         for i  in range(4):
-            self.next_msg = self.infile.read(500)
+            self.next_msg = self.infile.read(200)
             if self.next_msg == "":
                 self.msg_type = 'end'
             packet = self.make_packet(self.msg_type, self.toSendSeqno, self.next_msg)
@@ -112,30 +113,40 @@ class Sender(BasicSender.BasicSender):
         msg_type, seqno = self.split_message(ack) #note seqno = no. of packet sent + 1
 
         if self.retrans == True:
+            print("self.retrans is True")
             self.currAckSeqno = int(seqno) - 1
 
             #removed previously acked msgs
             for i in self.seq_msgs.keys():
-                if i < self.currAckSeqno:
+                if int(i) < self.currAckSeqno:
                     del self.seq_msgs[i]
-                    del self.seq_acks[i + 1]
                     if i in self.times.keys():
                         del self.times[i]
+            #removed previous acks
+            for j in self.seq_acks.keys():
+                if int(j) < self.currAckSeqno:
+                    del self.seq_acks[j]
+
             self.retrans = False
 
         print(self.seq_acks.keys())
         print("self.currAckSeqno: " + str(self.currAckSeqno))
-        for n in sorted(self.seq_acks.keys()):
+
+        for n in self.seq_acks.keys():
             if n == str(self.currAckSeqno + 1):
+                # print("stuck flag 1")
                 del self.seq_acks[n]
                 if self.currAckSeqno in self.seq_msgs:
                     del self.seq_msgs[self.currAckSeqno]
-                # del self.times[self.currAckSeqno]
+
+                print("printing sencond time")
+                print(self.seq_acks.keys())
 
                 self.currAckSeqno += 1
-                # print("self.currAckSeqno: " + str(self.currAckSeqno))
 
                 #sending more packets
+
+                # print("stuck flag 2")
                 if self.msg_type == 'end': #we've sent all packets - now we just wait for all acks
                     return
                 else:
@@ -143,7 +154,7 @@ class Sender(BasicSender.BasicSender):
 
                         #send all packets we can send in a window
                         for i in range(self.toSendSeqno, self.currAckSeqno + self.max_buf_size):
-                            self.next_msg = self.infile.read(500)
+                            self.next_msg = self.infile.read(200)
                             self.msg_type = 'data'
                             if self.next_msg == "":
                                 self.msg_type = 'end'
@@ -252,10 +263,3 @@ if __name__ == "__main__":
         s.start()
     except (KeyboardInterrupt, SystemExit):
         exit()
-
-
-            # #check for time out
-            # if time.time() - self.updated > self.timeout:
-            #     print("Sender.py packet timed out")
-            #     self.handle_timeout()
-            # else:

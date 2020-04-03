@@ -119,6 +119,7 @@ class Receiver():
         message = "%s%s" % (m, checksum)
         if self.debug:
             print "Receiver.py: send ack %s" % m
+        # print("sent ack" + str(message))
         self.send(message, address)
 
     def _handle_start(self, seqno, data, address):

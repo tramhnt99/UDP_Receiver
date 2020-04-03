@@ -13,8 +13,8 @@ create your own.
 class RandomDropTest(BasicTest):
     def handle_packet(self):
         for p in self.forwarder.in_queue:
-            i = random.randint(1,100)
-            if i < 90:
+            i = random.randint(1,1000)
+            if i > 505:
                 self.forwarder.out_queue.append(p)
                 # print("forwarded: " + str(p))
             # else:

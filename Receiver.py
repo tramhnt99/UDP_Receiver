@@ -149,7 +149,6 @@ class Receiver():
 
     # handle end packets
     def _handle_end(self, seqno, data, address):
-        print("Receiver handle_end is run")
         if address in self.connections:
             conn = self.connections[address]
             ackno, res_data = conn.ack(seqno, data, self.sack_mode)

@@ -9,6 +9,7 @@ import Checksum
 class Connection:
     def __init__(self, host, port, start_seq, debug=False):
         self.debug = debug
+        # self.debug = True
         self.updated = time.time()
         self.current_seqno = start_seq - 1  # expect to ack from the start_seqno
         self.host = host
@@ -81,6 +82,7 @@ class Receiver():
                 except:
                     raise ValueError
                 if debug:
+                # if True:
                     print "Receiver.py: received %s|%d|%s|%s" % (
                     msg_type, seqno, data[:5], checksum)
                 if Checksum.validate_checksum(message):
@@ -118,6 +120,7 @@ class Receiver():
         checksum = Checksum.generate_checksum(m)
         message = "%s%s" % (m, checksum)
         if self.debug:
+        # if True:
             print "Receiver.py: send ack %s" % m
         # print("sent ack" + str(message))
         self.send(message, address)
@@ -146,12 +149,13 @@ class Receiver():
 
     # handle end packets
     def _handle_end(self, seqno, data, address):
+        print("Receiver handle_end is run")
         if address in self.connections:
             conn = self.connections[address]
             ackno, res_data = conn.ack(seqno, data, self.sack_mode)
             for l in res_data:
-                # if self.debug:
-                #    print l
+                if self.debug:
+                   print l
                 conn.record(l)
             self._send_ack(ackno, address)
 
@@ -206,6 +210,7 @@ if __name__ == "__main__":
     debug = False
     timeout = 10
     sack_mode = False
+    # sack_mode = True
 
     for o, a in opts:
         if o in ("-p", "--port="):

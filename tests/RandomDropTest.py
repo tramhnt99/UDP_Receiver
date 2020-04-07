@@ -14,7 +14,7 @@ class RandomDropTest(BasicTest):
     def handle_packet(self):
         for p in self.forwarder.in_queue:
             i = random.randint(1,1000)
-            if i > 505:
+            if i > 602:
                 self.forwarder.out_queue.append(p)
                 # print("forwarded: " + str(p))
             # else:
